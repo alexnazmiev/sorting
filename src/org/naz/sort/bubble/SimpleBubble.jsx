@@ -10,20 +10,22 @@ const span = 100;
 const radius = 20;
 const array = [4, 2, 5, 1, 3];
 
-const timeBetweenActions = 1000;
-const lastActionTime = 0;
+const timeBetweenActions = 2000;
 
 export class SimpleBubbleSort extends React.Component {
 
     layer;
     animation;
+    lastActionTime = 0;
 
     constructor() {
         super();
         this.state = {
             'coords': this.defineCoords(array),
             'actionStarted': false,
-            'actions': defineActions([...array])
+            'actions': defineActions([...array]),
+            'actionsCount': 0,
+            'additionalElements': []
         };
 
         this.action = this.action.bind(this);
@@ -32,10 +34,10 @@ export class SimpleBubbleSort extends React.Component {
 
     componentDidMount() {
         this.animation = new Animation(this.animationFunc, this.layer);
-        this.animation.start();
     }
 
     render() {
+        // console.log(this.state.actions);
         return (
             <>
                 <div>
@@ -49,13 +51,15 @@ export class SimpleBubbleSort extends React.Component {
     }
 
     renderArray(array) {
+        console.log(this.state.additionalElements);
         return (
             <Stage width={600} height={200}> 
                 <Layer ref={el => this.layer = el}>
                     {array.map((val, index) => {
                         return this.renderArrayEntry(val, this.state.coords[index])
                     })}
-                    {this.renderAdditionalElements()}
+                    {this.state.additionalElements}
+                    {/* {this.renderAdditionalElements()} */}
                 </Layer>
             </Stage>
         );
@@ -101,8 +105,10 @@ export class SimpleBubbleSort extends React.Component {
 
     action() {
         if (!this.state.actionStarted) {
+            this.animation.start();
             this.setState({'actionStarted': true});
         } else {
+            this.animation.stop();
             this.setState({'actionStarted': false});
         }
         
@@ -132,9 +138,39 @@ export class SimpleBubbleSort extends React.Component {
 
     animationFunc = (frame) => {
         if (this.state.actionStarted) {
-            console.log(frame.time);
-            console.log(frame.timeDiff);
+            if (frame.time / timeBetweenActions > this.state.actionsCount) {
+                console.log(frame.time);
+
+                const {actions, actionsCount, coords} = this.state;
+                
+                const action = actions[actionsCount];
+                console.log(action);
+                this.renderSwapActionStartState(action, coords);
+                
+                if (actionsCount + 1 >= actions.length) {
+                    this.animation.stop();
+                }
+                this.setState({'actionsCount': actionsCount + 1})
+            }
         }
+    }
+
+    renderSwapActionStartState = (action, coords) => {
+        const coordsFrom = coords[action.left];
+        const coordsTo = coords[action.right];
+        const startPoint = [coordsFrom.x + radius * 0.5, coordsFrom.y + 1.05 * radius];
+        const middlePoint = [(coordsTo.x + coordsFrom.x) / 2 , coordsTo.y + radius * 1.75];
+        const endPoint = [coordsTo.x - radius * 0.5, coordsTo.y + 1.07 * radius];
+        const arrow = <Arrow key={`from_${coordsFrom.x}_to_coordsTo.x`}
+            points={[...startPoint, ...middlePoint, ...endPoint]}
+            stroke = 'red'
+            fill = 'red'
+            strokeWidth = {2}
+            pointerLength = {5}
+            pointerWidth = {5}
+            tension = {0.5}
+        />;
+        this.setState({'additionalElements': [...this.state.additionalElements, arrow]});
     }
 
 }
