@@ -8,9 +8,13 @@ const firstEntryX = 100;
 const firstEntryY = 100;
 const span = 100;
 const radius = 20;
-const array = [4, 2, 5, 1, 3];
+const array = [63, 5, 63, 57, 67, 45, 33, 32, 23, 81];
 
-const timeBetweenActions = 3000;
+// const timeBetweenActions = 3000;
+
+const timeForCommonAction = 3000;
+const timeForEmptyAction = 1000;
+const pauseBetweenActions = 500;
 
 const initialAction = {'action': 'INITIAL'};
 
@@ -35,10 +39,13 @@ export class SimpleBubbleSort extends React.Component {
             'coords': this.defineCoords(array),
             'actions': [initialAction, ...defineActions([...array])],
             'animationStarted': false,
-            'actionsCount': 0,
+            // 'actionsCount': 0,
             'additionalElements': [],
             'actionStage': ACTION_NOT_STARTED,
-            'sortedElementsCount': 0
+            'sortedElementsCount': 0,
+
+            'commonActionsCount': 0,
+            'emptyActionsCount': 0
         };
 
         this.action = this.action.bind(this);
@@ -49,6 +56,7 @@ export class SimpleBubbleSort extends React.Component {
     }
 
     render() {
+        // console.log(this.state.actions);
         return (
             <>
                 <div>
@@ -63,7 +71,7 @@ export class SimpleBubbleSort extends React.Component {
 
     renderArray() {
         return (
-            <Stage width={600} height={200}> 
+            <Stage width={1100} height={200}> 
                 <Layer ref={el => this.layer = el}>
                     {this.doRenderArray()}
                     {this.state.additionalElements}
@@ -74,7 +82,7 @@ export class SimpleBubbleSort extends React.Component {
     
     doRenderArray = () => {
         const {array, sortedElementsCount} = this.state;
-        console.log(sortedElementsCount);
+        // console.log(sortedElementsCount);
         return array.map((val, index) => {
             return this.renderArrayEntry(val, this.state.coords[index], index >= array.length - sortedElementsCount)
         });
@@ -82,6 +90,7 @@ export class SimpleBubbleSort extends React.Component {
 
     renderArrayEntry(value, coords, sorted) {
         const {x, y} = coords;
+        const textX = value > 10 ? (x - radius / 2) : (x - radius / 2 + radius / 4);
         return (
             <React.Fragment key={`${value}_${coords.x}_${coords.y}`}>
                 <Circle
@@ -93,7 +102,7 @@ export class SimpleBubbleSort extends React.Component {
                     strokeWidth={2}
                 />
                 <Text
-                    x={x - radius / 2 + radius / 4}
+                    x={textX}
                     y={y - radius / 2}
                     text={value}
                     fontSize={20}
@@ -119,8 +128,8 @@ export class SimpleBubbleSort extends React.Component {
     }
 
     action() {
-        if (!this.state.actionsCount) {
-            this.setState({'actionsCount': 1});
+        if (!this.state.emptyActionsCount) {
+            this.setState({'emptyActionsCount': 1});
         }
 
         if (!this.state.animationStarted) {
@@ -137,65 +146,70 @@ export class SimpleBubbleSort extends React.Component {
         const {animationStarted, actionStage} = this.state;
 
         if (animationStarted) {
-            const {actionsCount} = this.state;
+            const {emptyActionsCount, commonActionsCount, actions, coords, array, sortedElementsCount} = this.state;
+            const totalActionsHappenedCount = emptyActionsCount + commonActionsCount;
+            const currentAction = actions[totalActionsHappenedCount];
+            const isCurrentActionEmpty = currentAction.action === 'EMPTY';
+
+            const totalTimeForActionsHappened = emptyActionsCount * timeForEmptyAction + 
+                                                commonActionsCount * timeForCommonAction + 
+                                                (emptyActionsCount + commonActionsCount) * pauseBetweenActions;
 
             switch (actionStage) {
                 case ACTION_NOT_STARTED:
-                    if (frame.time / timeBetweenActions > actionsCount) {
-        
-                        const {actions, actionsCount, coords} = this.state;
-                        
-                        const action = actions[actionsCount];
-                        this.renderSwapActionStartState(action, coords);
-                        this.setState({'actionStage': ACTION_INIT_STAGE});
+                    if (frame.time > totalTimeForActionsHappened) {
+                        this.renderSwapActionStartState(currentAction, coords);
+                        this.setState({'actionStage': isCurrentActionEmpty ? ACTION_FINISH_STAGE : ACTION_INIT_STAGE });
                     }
                 break;
 
                 case ACTION_INIT_STAGE:
-                    if (frame.time >= actionsCount * timeBetweenActions + 0.33 * timeBetweenActions) {
-                        console.log(frame.time);
-                        const {actions, actionsCount, coords} = this.state;
-                        const action = actions[actionsCount];
-
-                        this.renderSwapActionMiddleState(action, coords);
+                    if (!isCurrentActionEmpty && frame.time >= totalTimeForActionsHappened + 0.33 * timeForCommonAction) {
+                        this.renderSwapActionMiddleState(currentAction, coords);
                         this.setState({'actionStage': ACTION_MIDDLE_STAGE});
                     }
                 break;
 
                 case ACTION_MIDDLE_STAGE:
-                    if (frame.time >= actionsCount * timeBetweenActions + 0.66 * timeBetweenActions) {
-                        this.setSwapActionFinishState();
+                    if (!isCurrentActionEmpty && frame.time >= totalTimeForActionsHappened + 0.66 * timeForCommonAction) {
+                        swap(array, currentAction.left, currentAction.right)
                         this.setState({
+                            'array': array,
                             'actionStage': ACTION_FINISH_STAGE
                         });
                     }
                 break;
 
                 case ACTION_FINISH_STAGE:
-                    if (frame.time >= actionsCount * timeBetweenActions + 0.85 * timeBetweenActions) {
-                        this.setState({
-                            'actionStage': ACTION_NOT_STARTED
-                        });
-
-                        const {sortedElementsCount, actions, array} = this.state;
-
-                        if (actionsCount + 1 >= actions.length) {
+                    if ( 
+                        (!isCurrentActionEmpty && frame.time >= totalTimeForActionsHappened + 0.85 * timeForCommonAction) 
+                        ||
+                        (isCurrentActionEmpty && frame.time >= totalTimeForActionsHappened + 0.85 * timeForEmptyAction) 
+                       ) {
+                        if (totalActionsHappenedCount + 1 >= actions.length) {
                             this.animation.stop();
                             this.setState({
                                 'additionalElements': [],
                                 'sortedElementsCount': array.length
                             });
                         } else {
-                            const nextAction = actions[actionsCount + 1];
+                            const nextAction = actions[totalActionsHappenedCount + 1];
     
                             if (sortedElementsCount !== nextAction.cycleStep) {
                                 this.setState({'sortedElementsCount': nextAction.cycleStep});
                             }
-
-                            this.setState({
-                                'actionsCount': actionsCount + 1
-                            });
+                            
+                            if (isCurrentActionEmpty) {
+                                this.setState({'emptyActionsCount': emptyActionsCount + 1});
+                            } else {
+                                this.setState({'commonActionsCount': commonActionsCount + 1});
+                            }
                         }
+
+                        this.setState({
+                            'actionStage': ACTION_NOT_STARTED,
+                            'additionalElements': []
+                        });
                     }
                 break;
 
@@ -231,14 +245,6 @@ export class SimpleBubbleSort extends React.Component {
         const backwardArrow =this.arrowByPoints(backwardArrowPoints);
 
         this.setState({'additionalElements': [...this.state.additionalElements, forwardArrow, backwardArrow]});
-    }
-
-    setSwapActionFinishState = () => {
-        const {actions, actionsCount, array} = this.state;
-
-        const action = actions[actionsCount];
-        swap(array, action.left, action.right);
-        this.setState({'array': array});
     }
 
     pointerPoints(coordsFrom) {
