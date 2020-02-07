@@ -1,8 +1,10 @@
 import React from 'react';
-import { Stage, Layer, Circle, Text, Arrow } from 'react-konva';
+import { Stage, Layer, Circle, Text } from 'react-konva';
 import { Animation } from 'konva';
 
 import { defineActions, swap } from './Actions';
+import { Arrow, arrowKey } from '../arrow/Arrow';
+import { forwardCurvedArrowPoints, backwardCurvedArrowPoints, pointerPoints } from '../arrow/PointsCorrdsCalculator';
 
 const firstEntryX = 100;
 const firstEntryY = 100;
@@ -10,11 +12,9 @@ const span = 100;
 const radius = 20;
 const array = [63, 5, 63, 57, 67, 45, 33, 32, 23, 81];
 
-// const timeBetweenActions = 3000;
-
-const timeForCommonAction = 3000;
-const timeForEmptyAction = 1000;
-const pauseBetweenActions = 500;
+const timeForCommonAction = 1000;
+const timeForEmptyAction = 600;
+const pauseBetweenActions = 250;
 
 const initialAction = {'action': 'INITIAL'};
 
@@ -39,8 +39,7 @@ export class SimpleBubbleSort extends React.Component {
             'coords': this.defineCoords(array),
             'actions': [initialAction, ...defineActions([...array])],
             'animationStarted': false,
-            // 'actionsCount': 0,
-            'additionalElements': [],
+            'actionElements': [],
             'actionStage': ACTION_NOT_STARTED,
             'sortedElementsCount': 0,
 
@@ -74,7 +73,7 @@ export class SimpleBubbleSort extends React.Component {
             <Stage width={1100} height={200}> 
                 <Layer ref={el => this.layer = el}>
                     {this.doRenderArray()}
-                    {this.state.additionalElements}
+                    {this.state.actionElements}
                 </Layer>
             </Stage>
         );
@@ -153,20 +152,29 @@ export class SimpleBubbleSort extends React.Component {
 
             const totalTimeForActionsHappened = emptyActionsCount * timeForEmptyAction + 
                                                 commonActionsCount * timeForCommonAction + 
-                                                (emptyActionsCount + commonActionsCount) * pauseBetweenActions;
+                                                totalActionsHappenedCount * pauseBetweenActions;
 
             switch (actionStage) {
                 case ACTION_NOT_STARTED:
                     if (frame.time > totalTimeForActionsHappened) {
-                        this.renderSwapActionStartState(currentAction, coords);
-                        this.setState({'actionStage': isCurrentActionEmpty ? ACTION_FINISH_STAGE : ACTION_INIT_STAGE });
+                        const actionElements = this.renderPointers(currentAction, coords);
+                        const newActionStage = isCurrentActionEmpty ? ACTION_FINISH_STAGE : ACTION_INIT_STAGE;
+                        this.setState({
+                            'actionElements': actionElements,
+                            'actionStage': newActionStage 
+                        });
                     }
                 break;
 
                 case ACTION_INIT_STAGE:
                     if (!isCurrentActionEmpty && frame.time >= totalTimeForActionsHappened + 0.33 * timeForCommonAction) {
-                        this.renderSwapActionMiddleState(currentAction, coords);
-                        this.setState({'actionStage': ACTION_MIDDLE_STAGE});
+
+                        const actionElements = this.renderSwapArrows(currentAction, coords);
+
+                        this.setState({
+                            'actionElements': [...this.state.actionElements, ...actionElements],
+                            'actionStage': ACTION_MIDDLE_STAGE
+                        });
                     }
                 break;
 
@@ -189,7 +197,7 @@ export class SimpleBubbleSort extends React.Component {
                         if (totalActionsHappenedCount + 1 >= actions.length) {
                             this.animation.stop();
                             this.setState({
-                                'additionalElements': [],
+                                'actionElements': [],
                                 'sortedElementsCount': array.length
                             });
                         } else {
@@ -208,7 +216,7 @@ export class SimpleBubbleSort extends React.Component {
 
                         this.setState({
                             'actionStage': ACTION_NOT_STARTED,
-                            'additionalElements': []
+                            'actionElements': []
                         });
                     }
                 break;
@@ -221,79 +229,37 @@ export class SimpleBubbleSort extends React.Component {
 
     }
 
-    renderSwapActionStartState = (action, coords) => {
+    renderPointers(action, coords) {
         const coordsFrom = coords[action.left];
         const coordsTo = coords[action.right];
 
-        const currentPointerPoints = this.pointerPoints(coordsFrom);
-        const counterpartyPointerPoints = this.pointerPoints(coordsTo);
+        const currentPointerPoints = pointerPoints(coordsFrom, radius);
+        const counterpartyPointerPoints = pointerPoints(coordsTo, radius);
 
-        const currentPointer = this.pointerByPoints(currentPointerPoints);
-        const counterpartyPointer = this.pointerByPoints(counterpartyPointerPoints);
+        const currentPointer = this.arrow(currentPointerPoints, true);
+        const counterpartyPointer = this.arrow(counterpartyPointerPoints, true);
 
-        this.setState({'additionalElements': [currentPointer, counterpartyPointer]});
+        return [currentPointer, counterpartyPointer];
     }
 
-    renderSwapActionMiddleState = (action, coords) => {
+    renderSwapArrows(action, coords) {
         const coordsFrom = coords[action.left];
         const coordsTo = coords[action.right];
 
-        const forwarArrowPoints = this.forwardArrowPoints(coordsFrom, coordsTo);
-        const backwardArrowPoints = this.backwardArrowPoints(coordsFrom, coordsTo);
+        const forwarArrowPoints = forwardCurvedArrowPoints(coordsFrom, coordsTo, radius);
+        const backwardArrowPoints = backwardCurvedArrowPoints(coordsFrom, coordsTo, radius);
 
-        const forwardArrow = this.arrowByPoints(forwarArrowPoints);
-        const backwardArrow =this.arrowByPoints(backwardArrowPoints);
+        const forwardArrow = this.arrow(forwarArrowPoints);
+        const backwardArrow =this.arrow(backwardArrowPoints);
 
-        this.setState({'additionalElements': [...this.state.additionalElements, forwardArrow, backwardArrow]});
+        return [forwardArrow, backwardArrow];
     }
 
-    pointerPoints(coordsFrom) {
-        return {
-            'startPoint': [coordsFrom.x, coordsFrom.y + 2.5 * radius],
-            'endPoint': [coordsFrom.x, coordsFrom.y + 1.2 * radius],
-        }
-    }
-
-    forwardArrowPoints(coordsFrom, coordsTo) {
-        return {
-            'startPoint': [coordsFrom.x + radius * 0.5, coordsFrom.y + 1.05 * radius],
-            'middlePoint': [(coordsTo.x + coordsFrom.x) / 2 , coordsTo.y + radius * 1.75],
-            'endPoint': [coordsTo.x - radius * 0.5, coordsTo.y + 1.07 * radius]
-        }
-    }
-
-    backwardArrowPoints(coordsFrom, coordsTo) {
-        return {
-            'startPoint': [coordsTo.x - radius * 0.5, coordsTo.y - 1.05 * radius],
-            'middlePoint': [(coordsTo.x + coordsFrom.x) / 2 , coordsTo.y - radius * 1.75],
-            'endPoint': [coordsFrom.x + radius * 0.5, coordsFrom.y - 1.07 * radius]
-        }
-    }
-
-    arrowByPoints(arrowPoints) {
+    arrow(arrowPoints, pointer = false) {
         return (
-            <Arrow key={`from_${arrowPoints.startPoint[0]}_to_${arrowPoints.endPoint[0]}`}
-                points={[...arrowPoints.startPoint, ...arrowPoints.middlePoint, ...arrowPoints.endPoint]}
-                stroke = 'red'
-                fill = 'red'
-                strokeWidth = {2}
-                pointerLength = {5}
-                pointerWidth = {5}
-                tension = {0.5}
-            />
-        );
-    }
-
-    pointerByPoints(pointerPoints) {
-        return (
-            <Arrow key={`From_${pointerPoints.startPoint[0]}_${pointerPoints.startPoint[1]}_To_${pointerPoints.endPoint[0]}_${pointerPoints.endPoint[1]}`}
-                points={[...pointerPoints.startPoint, ...pointerPoints.endPoint]}
-                stroke = 'black'
-                fill = 'black'
-                strokeWidth = {2}
-                pointerLength = {5}
-                pointerWidth = {5}
-                tension = {0.5}
+            <Arrow key = {arrowKey(arrowPoints)}
+                pointsArray = {arrowPoints}
+                color = {pointer ? 'black' : 'red'}
             />
         );
     }
