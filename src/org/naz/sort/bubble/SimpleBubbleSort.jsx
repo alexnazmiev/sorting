@@ -23,20 +23,19 @@ const sortedColor = 'yellow';
 
 const ACTION_NOT_STARTED = 'ACTION_NOT_STARTED';
 const ACTION_INIT_STAGE = 'ACTION_INIT_STAGE';
-const ACTION_MIDDLE_STAGE = 'ACTION_MIDDLE_STAGE';
+const ACTION_ACT_STAGE = 'ACTION_ACT_STAGE';
 const ACTION_FINISH_STAGE = 'ACTION_FINISH_STAGE';
 
 export class SimpleBubbleSort extends React.Component {
 
     layer;
     animation;
-    lastActionTime = 0;
 
     constructor() {
         super();
         this.state = {
             'array': array,
-            'coords': this.defineCoords(array),
+            'coords': this.defineArrayElementsCoords(array),
             'actions': [initialAction, ...defineActions([...array])],
             'animationStarted': false,
             'actionElements': [],
@@ -62,28 +61,28 @@ export class SimpleBubbleSort extends React.Component {
                     <button onClick={this.action}>Action</button>
                 </div>
                 <div>
-                    {this.renderArray()}
+                    {this.renderStage()}
                 </div>
             </>
         );
     }
 
-    renderArray() {
+    renderStage() {
         return (
             <Stage width={1100} height={200}> 
                 <Layer ref={el => this.layer = el}>
-                    {this.doRenderArray()}
+                    {this.renderArray()}
                     {this.state.actionElements}
                 </Layer>
             </Stage>
         );
     }
     
-    doRenderArray = () => {
+    renderArray = () => {
         const {array, sortedElementsCount} = this.state;
-        // console.log(sortedElementsCount);
         return array.map((val, index) => {
-            return this.renderArrayEntry(val, this.state.coords[index], index >= array.length - sortedElementsCount)
+            const isSorted = index >= array.length - sortedElementsCount;
+            return this.renderArrayEntry(val, this.state.coords[index], isSorted);
         });
     }
 
@@ -110,7 +109,7 @@ export class SimpleBubbleSort extends React.Component {
         );
     }
 
-    defineCoords(array) {
+    defineArrayElementsCoords(array) {
         return array.map((val, index) => {
             if (index === 0) {
                 return {
@@ -173,12 +172,12 @@ export class SimpleBubbleSort extends React.Component {
 
                         this.setState({
                             'actionElements': [...this.state.actionElements, ...actionElements],
-                            'actionStage': ACTION_MIDDLE_STAGE
+                            'actionStage': ACTION_ACT_STAGE
                         });
                     }
                 break;
 
-                case ACTION_MIDDLE_STAGE:
+                case ACTION_ACT_STAGE:
                     if (!isCurrentActionEmpty && frame.time >= totalTimeForActionsHappened + 0.66 * timeForCommonAction) {
                         swap(array, currentAction.left, currentAction.right)
                         this.setState({

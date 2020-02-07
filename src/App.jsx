@@ -1,5 +1,5 @@
 import React from 'react';
-import { SimpleBubbleSort } from './org/naz/sort/bubble/SimpleBubble';
+import { SimpleBubbleSort } from './org/naz/sort/bubble/SimpleBubbleSort';
 import './App.css';
 
 
